@@ -1,0 +1,26 @@
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { AppController } from './app.controller';
+import { AppService } from './app.service';
+import { PrismaModule } from 'nestjs-prisma';
+import { authorization } from './auth.middleware';
+import { LoginModule } from './login/login.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { ConfigModule } from '@nestjs/config';
+
+@Module({
+  imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
+    PrismaModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
+    LoginModule,
+  ],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer
+      .apply(authorization)
+      .forRoutes('/login/create', '/transaction/fetch', '/transaction/update');
+  }
+}
