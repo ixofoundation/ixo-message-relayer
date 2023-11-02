@@ -14,6 +14,7 @@ model Login {
   hash       String   @id
   secureHash String   @unique
   data       Json
+  success    Boolean
   validUntil DateTime
 }
 
@@ -23,7 +24,8 @@ model Transaction {
   did        String
   pubkey     String
   txBodyHex  String
+  success    Boolean  @default(false)
   validUntil DateTime
-  response   Json?
-  timestamp  String
+  data       Json?
+  timestamp  DateTime
 }

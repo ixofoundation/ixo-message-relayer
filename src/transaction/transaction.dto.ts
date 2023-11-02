@@ -13,5 +13,6 @@ export class TransactionFetchDto {
 
 export class TransactionUpdateDto {
   hash: string;
-  response: string;
+  data: string;
+  success: boolean;
 }

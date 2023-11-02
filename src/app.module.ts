@@ -4,6 +4,7 @@ import { AppService } from './app.service';
 import { PrismaModule } from 'nestjs-prisma';
 import { authorization } from './auth.middleware';
 import { LoginModule } from './login/login.module';
+import { TransactionModule } from './transaction/transaction.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
 
@@ -13,6 +14,7 @@ import { ConfigModule } from '@nestjs/config';
     PrismaModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
     LoginModule,
+    TransactionModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -5,8 +5,8 @@ import {
   TransactionUpdateDto,
 } from './transaction.dto';
 import { PrismaService } from 'nestjs-prisma';
-import { hashTransactData } from 'src/helpers/encoding';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { hashTransactData } from '@ixo/signx-sdk';
 
 @Injectable()
 export class TransactionService {
@@ -24,7 +24,9 @@ export class TransactionService {
     ) {
       return {
         success: false,
-        message: 'Invalid request, missing parameters',
+        data: {
+          message: 'Invalid request, missing parameters',
+        },
       };
     }
 
@@ -40,7 +42,9 @@ export class TransactionService {
     if (generatedHash !== dto.hash) {
       return {
         success: false,
-        message: 'Invalid request',
+        data: {
+          message: 'Invalid request',
+        },
       };
     }
 
@@ -58,14 +62,17 @@ export class TransactionService {
       create: {
         hash: dto.hash,
         ...data,
+        success: false,
       },
       update: data,
     });
 
     return {
       success: true,
-      message: 'Transaction request created successfully',
-      validUntil,
+      data: {
+        message: 'Transaction request created successfully',
+        validUntil,
+      },
     };
   }
 
@@ -74,7 +81,9 @@ export class TransactionService {
     if (!dto.hash) {
       return {
         success: false,
-        message: 'Invalid request, missing parameters',
+        data: {
+          message: 'Invalid request, missing parameters',
+        },
       };
     }
 
@@ -84,24 +93,33 @@ export class TransactionService {
     if (!transaction) {
       return {
         success: false,
-        message: 'Transaction request not found',
+        data: {
+          message: 'Transaction request not found',
+        },
       };
     }
     if (transaction.validUntil < new Date()) {
       return {
         success: false,
-        message: 'Transaction request expired',
+        data: {
+          message: 'Transaction request expired',
+        },
       };
     }
-    return transaction;
+    return {
+      success: true,
+      data: transaction,
+    };
   }
 
   async updateTransaction(dto: TransactionUpdateDto) {
     // validate request
-    if (!dto.hash || !dto.response) {
+    if (!dto.hash || !dto.data || typeof dto.success !== 'boolean') {
       return {
         success: false,
-        message: 'Invalid request, missing parameters',
+        data: {
+          message: 'Invalid request, missing parameters',
+        },
       };
     }
 
@@ -111,24 +129,30 @@ export class TransactionService {
     if (!transaction) {
       return {
         success: false,
-        message: 'Transaction request not found',
+        data: {
+          message: 'Transaction request not found',
+        },
       };
     }
-    if (transaction.response) {
+    if (transaction.data) {
       return {
         success: false,
-        message: 'Transaction request already contains a response',
+        data: {
+          message: 'Transaction request already contain data',
+        },
       };
     }
 
     await this.prisma.transaction.update({
       where: { hash: dto.hash },
-      data: { response: dto.response },
+      data: { data: dto.data, success: dto.success },
     });
 
     return {
       success: true,
-      message: 'Transaction request updated successfully',
+      data: {
+        message: 'Transaction request updated successfully',
+      },
     };
   }
 
@@ -137,7 +161,9 @@ export class TransactionService {
     if (!dto.hash) {
       return {
         success: false,
-        message: 'Invalid request, missing parameters',
+        data: {
+          message: 'Invalid request, missing parameters',
+        },
       };
     }
 
@@ -147,17 +173,28 @@ export class TransactionService {
     if (!transaction) {
       return {
         success: false,
-        message: 'Transaction request not found',
+        data: {
+          message: 'Transaction request not found',
+        },
       };
     }
-    if (!transaction.response) {
+    if (!transaction.data) {
       return {
         success: false,
-        message: 'Transaction request does not contain a response',
         code: 418,
+        data: {
+          message: 'Transaction request does not contain data',
+        },
       };
     }
-    return transaction.response;
+    return {
+      success: true,
+      data: {
+        message: 'Transaction request found',
+        data: transaction.data,
+        success: transaction.success,
+      },
+    };
   }
 
   // clear expired transaction requests every minute

@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { LoginFetchDto, LoginCreateDto } from './login.dto';
 import { PrismaService } from 'nestjs-prisma';
-import { generateSecureHash } from 'src/helpers/encoding';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { generateSecureHash } from '@ixo/signx-sdk';
 
 @Injectable()
 export class LoginService {
@@ -10,10 +10,17 @@ export class LoginService {
 
   async createLogin(dto: LoginCreateDto) {
     // validate request
-    if (!dto.hash || !dto.secureHash || !dto.data) {
+    if (
+      !dto.hash ||
+      !dto.secureHash ||
+      !dto.data ||
+      typeof dto.success !== 'boolean'
+    ) {
       return {
         success: false,
-        message: 'Invalid request, missing parameters',
+        data: {
+          message: 'Invalid request, missing parameters',
+        },
       };
     }
 
@@ -26,18 +33,21 @@ export class LoginService {
         secureHash: dto.secureHash,
         data: dto.data,
         validUntil,
+        success: dto.success,
       },
       update: {
         secureHash: dto.secureHash,
         data: dto.data,
         validUntil,
+        success: dto.success,
       },
     });
 
     return {
       success: true,
-      message: 'Login request created successfully',
-      validUntil,
+      data: {
+        message: 'Login request created successfully',
+      },
     };
   }
 
@@ -46,7 +56,9 @@ export class LoginService {
     if (!dto.hash || !dto.secureNonce) {
       return {
         success: false,
-        message: 'Invalid request, missing parameters',
+        data: {
+          message: 'Invalid request, missing parameters',
+        },
       };
     }
 
@@ -56,8 +68,10 @@ export class LoginService {
     if (!login) {
       return {
         success: false,
-        message: 'Login request not found',
         code: 418,
+        data: {
+          message: 'Login request not found',
+        },
       };
     }
 
@@ -66,20 +80,31 @@ export class LoginService {
     if (login.secureHash !== secureHash) {
       return {
         success: false,
-        message: 'Invalid request',
+        data: {
+          message: 'Invalid request',
+        },
       };
     }
     if (login.validUntil < new Date()) {
       return {
         success: false,
-        message: 'Login request expired',
+        data: {
+          message: 'Login request expired',
+        },
       };
     }
 
     // remove login request after fetching
     await this.prisma.login.delete({ where: { hash: dto.hash } });
 
-    return login.data;
+    return {
+      success: true,
+      data: {
+        message: 'Login request fetched successfully',
+        data: login.data,
+        success: login.success,
+      },
+    };
   }
 
   // clear expired login requests every minute

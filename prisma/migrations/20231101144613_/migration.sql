@@ -3,6 +3,7 @@ CREATE TABLE "Login" (
     "hash" TEXT NOT NULL,
     "secureHash" TEXT NOT NULL,
     "data" JSONB NOT NULL,
+    "success" BOOLEAN NOT NULL,
     "validUntil" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Login_pkey" PRIMARY KEY ("hash")
@@ -15,9 +16,10 @@ CREATE TABLE "Transaction" (
     "did" TEXT NOT NULL,
     "pubkey" TEXT NOT NULL,
     "txBodyHex" TEXT NOT NULL,
+    "success" BOOLEAN NOT NULL DEFAULT false,
     "validUntil" TIMESTAMP(3) NOT NULL,
-    "response" JSONB,
-    "timestamp" TEXT NOT NULL,
+    "data" JSONB,
+    "timestamp" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "Transaction_pkey" PRIMARY KEY ("hash")
 );
