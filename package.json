@@ -4,7 +4,7 @@
   "description": "Ixo message relayer to execute message signing for web from mobile",
   "author": "Ixo Foundation",
   "private": true,
-  "license": "MIT",
+  "license": "SEE LICENSE IN LICENSE",
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "nest build",
