@@ -12,7 +12,7 @@ import {
 export class TransactionController {
   constructor(private readonly transactionService: TransactionService) {}
 
-  @Post('/create')
+  @Post('/create') // for client
   createTransactionRequest(@Body() dto: TransactionCreateDto) {
     try {
       return this.transactionService.createTransaction(dto);
@@ -21,7 +21,7 @@ export class TransactionController {
     }
   }
 
-  @Post('/fetch')
+  @Post('/fetch') // for mobile
   fetchTransactionRequest(@Body() dto: TransactionFetchDto) {
     try {
       return this.transactionService.fetchTransaction(dto);
@@ -30,7 +30,7 @@ export class TransactionController {
     }
   }
 
-  @Post('/update')
+  @Post('/update') // for mobile
   updateTransactionRequest(@Body() dto: TransactionUpdateDto) {
     try {
       return this.transactionService.updateTransaction(dto);
@@ -39,7 +39,7 @@ export class TransactionController {
     }
   }
 
-  @Post('/response')
+  @Post('/response') // for client
   responseTransactionRequest(@Body() dto: TransactionFetchDto) {
     try {
       return this.transactionService.responseTransaction(dto);

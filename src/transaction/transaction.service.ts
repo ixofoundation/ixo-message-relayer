@@ -197,7 +197,7 @@ export class TransactionService {
     };
   }
 
-  // clear expired transaction requests every minute
+  // clear expired transaction requests every 5 minutes
   @Cron(CronExpression.EVERY_5_MINUTES)
   async clearExpiredTransactions() {
     await this.prisma.transaction.deleteMany({

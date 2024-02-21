@@ -8,7 +8,7 @@ import { LoginFetchDto, LoginCreateDto } from './login.dto';
 export class LoginController {
   constructor(private readonly loginService: LoginService) {}
 
-  @Post('/create')
+  @Post('/create') // for mobile
   createLoginRequest(@Body() dto: LoginCreateDto) {
     try {
       return this.loginService.createLogin(dto);
@@ -17,7 +17,7 @@ export class LoginController {
     }
   }
 
-  @Post('/fetch')
+  @Post('/fetch') // for client
   fetchLoginRequest(@Body() dto: LoginFetchDto) {
     try {
       return this.loginService.fetchLogin(dto);
