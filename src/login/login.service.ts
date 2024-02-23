@@ -54,7 +54,7 @@ export class LoginService {
       where: { hash: dto.hash },
     });
     if (!login) {
-      return returnError('Login request not found', 418);
+      return returnError('Login request not found', 418); // 418 I'm a teapot, for sdk to know to keep polling
     }
 
     // validate request

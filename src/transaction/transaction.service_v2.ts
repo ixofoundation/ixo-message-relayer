@@ -132,10 +132,10 @@ export class TransactionServiceV2 {
     });
 
     if (!session) {
-      return returnError('Transactions session not found');
+      return returnError('Transactions session not found', 418); // 418 I'm a teapot, for sdk to know to start new session
     }
     if (session.validUntil < new Date()) {
-      return returnError('Transactions session expired');
+      return returnError('Transactions session expired', 418); // 418 I'm a teapot, for sdk to know to start new session
     }
     if (session.transactions.length + dto.transactions.length >= 100) {
       return returnError(
@@ -350,7 +350,7 @@ export class TransactionServiceV2 {
     }
 
     if (!transaction.data) {
-      return returnError('Transaction request does not contain data', 418);
+      return returnError('Transaction request does not contain data', 418); // 418 I'm a teapot, for sdk to know to keep polling
     }
 
     const nextActiveTrx = await this.prisma.transactionV2.findFirst({
@@ -408,7 +408,7 @@ export class TransactionServiceV2 {
     const nextActiveTrx = session.transactions.find((t) => t.active);
 
     if (!nextActiveTrx) {
-      return returnError('Transaction session has no active transaction', 418);
+      return returnError('Transaction session has no active transaction', 418); // 418 I'm a teapot, for sdk to know to keep polling
     }
 
     return returnSuccess({
@@ -425,11 +425,11 @@ export class TransactionServiceV2 {
   // clear expired transaction requests every minute
   @Cron(CronExpression.EVERY_MINUTE)
   async clearExpiredTransactionSessions() {
-    const nowPlus2Minutes = new Date(Date.now() + 1000 * 60 * 2); // 2 minutes added to current time for leaway gap
+    const nowSub2Minutes = new Date(Date.now() - 1000 * 60 * 2); // 2 minutes subtracted to current time for leaway gap
     await this.prisma.transactionsSessionV2.deleteMany({
       where: {
         validUntil: {
-          lte: nowPlus2Minutes,
+          lte: nowSub2Minutes,
         },
       },
     });
