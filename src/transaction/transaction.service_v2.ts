@@ -223,28 +223,41 @@ export class TransactionServiceV2 {
 
     const session = await this.prisma.transactionsSessionV2.findUnique({
       where: { hash: dto.hash },
+      include: { transactions: true },
     });
     if (!session) {
       return returnError('Transaction session not found');
+    }
+    if (session.validUntil < new Date()) {
+      return returnError('Transaction session expired');
     }
 
     return returnSuccess(session);
   }
 
-  async fetchTransaction(dto: TransactionFetchDto) {
+  async fetchTransaction(dto: TransactionFetchDto): Promise<any> {
     // validate request
     if (!dto.hash) {
       return returnError('Invalid request, missing parameters');
     }
 
-    const transaction = await this.prisma.transactionV2.findUnique({
+    const session = await this.prisma.transactionsSessionV2.findUnique({
       where: { hash: dto.hash },
+      include: { transactions: true },
     });
-    if (!transaction) {
-      return returnError('Transaction request not found');
+    if (!session) {
+      return returnError('Transaction session not found');
+    }
+    if (session.validUntil < new Date()) {
+      return returnError('Transaction session expired');
     }
 
-    return returnSuccess(transaction);
+    const activeTrx = session.transactions.find((t) => t.active);
+    if (!activeTrx) {
+      return returnError('No next active transaction', 418); // 418 I'm a teapot, for mobile to know to keep polling
+    }
+
+    return returnSuccess(activeTrx);
   }
 
   async updateTransaction(dto: TransactionUpdateDto) {
@@ -315,7 +328,7 @@ export class TransactionServiceV2 {
     });
   }
 
-  async responseTransaction(dto: TransactionV2ResponseDto) {
+  async responseTransaction(dto: TransactionV2ResponseDto): Promise<any> {
     // validate request
     if (!dto.hash || !dto.secureNonce) {
       return returnError('Invalid request, missing parameters');
@@ -378,7 +391,7 @@ export class TransactionServiceV2 {
     });
   }
 
-  async sessionNextActive(dto: TransactionV2ResponseDto) {
+  async sessionNextActive(dto: TransactionV2ResponseDto): Promise<any> {
     // validate request
     if (!dto.hash || !dto.secureNonce) {
       return returnError('Invalid request, missing parameters');

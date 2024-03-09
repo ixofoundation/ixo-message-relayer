@@ -6,18 +6,29 @@ import { urlencoded, json } from 'express';
 import { AppModule } from './app.module';
 import * as Sentry from '@sentry/node';
 import '@sentry/tracing';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import compression from 'compression';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { cors: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    cors: true,
+  });
+
+  // for when behind a reverse proxy such as nginx
+  app.set('trust proxy', process.env.TRUST_PROXY || 1);
+
   app.use(json({ limit: '500mb' }));
   app.use(urlencoded({ limit: '500mb', extended: true }));
   app.use(helmet({ crossOriginResourcePolicy: false }));
+  app.use(compression());
   app.use(
     rateLimit({
-      windowMs: 1 * 60 * 1000,
+      windowMs: 1 * 1000,
       max: 100,
       standardHeaders: true,
       legacyHeaders: false,
+      message:
+        'Too many requests from this IP, please try again after 1 second',
     }),
   );
 

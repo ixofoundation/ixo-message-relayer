@@ -407,3 +407,73 @@ curl -X POST https://[server-address]/transaction/response \
 ## 📃 License
 
 This SDK is licensed under the Apache 2 License. See the [LICENSE](/LICENSE) file for more information.
+
+### Extra
+
+1
+When considering the implementation of Options 2 (Session-based Transaction Signing) and 3 (Deferred Transactions with Callbacks) with the inclusion of QR scanning and deep linking for mobile app interaction—especially when the browser and app are on the same device—it's important to take into account the unique behavior and limitations of mobile operating systems, like iOS and Android. These behaviors can significantly influence the user experience and technical feasibility of your solution.
+
+Option 2: Session-based Transaction Signing
+
+Pros:
+
+- Continuous Interaction: Establishes a sustained session between the web client and mobile app, which is beneficial for a series of transactions, providing a seamless experience without repeated QR scans or deep links.
+- Dynamic Transaction Handling: Allows for the addition or modification of transactions in real-time within the session, offering flexibility to adapt based on user actions or previous transaction outcomes.
+
+Cons:
+
+- Background Processing Limitations on iOS: When using deep links to transition from a mobile browser to an app, the browser's ability to run in the background is limited, especially on iOS. This could disrupt the session-based flow if the web client needs to communicate with the server while in the background.
+- Complexity in Session Management: Maintaining a secure and reliable session state across the mobile and web platforms adds complexity, especially in handling timeouts, reconnections, or user interruptions.
+
+Option 3: Deferred Transactions with Callbacks
+
+Pros:
+
+- Flexibility in Transaction Sequencing: Each transaction can be handled independently, with the server controlling the flow based on callbacks. This allows for transactions to be processed sequentially without requiring the web client to be actively engaged in the background.
+- Reduced Impact of Background Limitations: Since the mobile app communicates directly with the server to fetch and sign transactions, the limitations of background processing in browsers have less impact on the overall flow. Notifications or deep links can be used to prompt the user to return to the app for each transaction.
+
+Cons:
+
+- Dependency on Notifications: This approach relies on the ability to notify the user to sign the next transaction, which could be impacted by device settings, notification permissions, or network issues.
+- ser Experience: While this reduces the need for the web client to be active, it may require the user to switch back and forth between the app and the browser (or notifications), which could affect the user experience.
+
+Considerations for Mobile Browser to Mobile App Transitions:
+
+- Deep Link Handling: Both Android and iOS handle deep links differently, especially when transitioning from a web browser to an app. Ensuring a smooth transition requires careful handling of URL schemes and intent filters.
+- App State Management: When a user transitions from a browser to an app via deep link, managing the app's state (e.g., ensuring the correct transaction is ready for signing) becomes crucial.
+- Background Execution: iOS, in particular, restricts background execution for web content once a user has switched to another app, which could impact the flow if the web client needs to perform actions (like polling or receiving callbacks) while the user is engaged with the mobile app.
+
+Making the Choice:
+When choosing between Options 2 and 3, consider the following:
+
+- If your use case benefits from a seamless, continuous user experience with the flexibility to manage transactions dynamically, Option 2 might be more suitable, despite its complexity.
+- If you prefer a more straightforward implementation that can handle transactions sequentially with minimal dependency on the web client's background activity, Option 3 could be a better fit, especially if the user experience of switching between apps and handling notifications is adequately addressed.
+
+Both options present viable paths forward but require thoughtful consideration of the mobile ecosystem's constraints and the user experience you aim to provide.
+
+---
+
+Your proposed approach for Option 2 sounds well-thought-out and addresses several key aspects: security, session management, user experience, and flexibility for handling transaction sequences. Let's break down the components and considerations of your adjusted approach:
+
+Adjusted Session-based Transaction Signing
+
+1. Maintain Login Security:
+   Keeping the login action outside the session-based model ensures that the initial authentication remains straightforward and secure.
+
+2. Short-lived Sessions for Transaction Sequences:
+   Initiating sessions for transaction sequences enhances security by limiting the session's lifespan to the duration of the transaction sequence. This minimizes potential attack vectors.
+   Implementing a session timeout further ensures that sessions are not left open indefinitely, reducing security risks.
+
+3. Session Creation with Secure Hashing:
+   For each transaction sequence, the SDK generates a unique sessionId (using a secureHash derived from the first transaction's hash and a secureNonce known only to the SDK). This approach mirrors the login flow's security measures, ensuring that only the SDK can initiate and manage the session.
+   This method also allows for the validation of the first transaction's data on the mobile app by matching it against the hash received via QR scan or deep link.
+
+4. Session Management and Transaction Updates:
+   The server permits updates to transactions for a session only if the correct secureNonce is provided, validating the SDK's authority to make changes within the session.
+   On the mobile app, the transaction signing flow remains active for the user until the session is explicitly closed (either by the SDK, the user through the app, or due to a timeout).
+
+5. Dynamic Transaction Handling by the SDK:
+   Developers can dynamically manage transactions within a session, adding new transactions based on the outcomes of previous ones. This flexibility allows for complex transaction sequences, where the results of one transaction may influence the parameters of the next.
+
+6. Front-end Session Closure Indication:
+   Allowing users to close the session through the front-end interface provides a clear and user-friendly way to end transaction sequences. This action should be communicated back to the server to properly close the session and inform the SDK.

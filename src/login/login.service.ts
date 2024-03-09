@@ -44,7 +44,7 @@ export class LoginService {
     });
   }
 
-  async fetchLogin(dto: LoginFetchDto) {
+  async fetchLogin(dto: LoginFetchDto): Promise<any> {
     // validate request
     if (!dto.hash || !dto.secureNonce) {
       return returnError('Invalid request, missing parameters');
