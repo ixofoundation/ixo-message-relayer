@@ -23,6 +23,13 @@ export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer
       .apply(authorization)
-      .forRoutes('/login/create', '/transaction/fetch', '/transaction/update');
+      .forRoutes(
+        '/login/create',
+        '/transaction/fetch',
+        '/transaction/update',
+        '/transaction/v2/fetch',
+        '/transaction/v2/session',
+        '/transaction/v2/update',
+      );
   }
 }

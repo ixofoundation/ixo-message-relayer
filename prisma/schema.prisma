@@ -29,3 +29,25 @@ model Transaction {
   data       Json?
   timestamp  DateTime
 }
+
+model TransactionsSessionV2 {
+  hash         String          @id // SessionHash/secureHash
+  address      String
+  did          String
+  pubkey       String
+  validUntil   DateTime
+  transactions TransactionV2[]
+}
+
+model TransactionV2 {
+  hash                    String                 @id
+  txBodyHex               String
+  success                 Boolean                @default(false)
+  validUntil              DateTime?
+  data                    Json? // Data from the transaction, or error message, field indicating if transaction has been handled
+  timestamp               DateTime
+  sequence                Int
+  active                  Boolean                @default(false)
+  TransactionsSession     TransactionsSessionV2? @relation(fields: [transactionsSessionHash], references: [hash], onDelete: Cascade)
+  transactionsSessionHash String?
+}
