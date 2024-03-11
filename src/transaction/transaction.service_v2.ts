@@ -287,11 +287,16 @@ export class TransactionServiceV2 {
       return returnError('Transaction session not found');
     }
 
-    const nextActiveTrx = session.transactions.find(
-      (s) => s.sequence === transaction.sequence + 1,
-    );
+    // if the update for transaction is success, set next transaction as active, otherwise dont to break session flow
+    const nextActiveTrx = dto.success
+      ? session.transactions.find(
+          (s) => s.sequence === transaction.sequence + 1,
+        )
+      : undefined;
 
-    const validUntil = new Date(Date.now() + 1000 * 60 * 2); // 2 minutes
+    // if the update for transaction is success, update session validUntil to 2 minutes from now, otherwise expire it, so
+    // clients can handle the error, but need to start new session
+    const validUntil = new Date(Date.now() + (dto.success ? 1000 * 60 * 2 : 0)); // 2 minutes
 
     await this.prisma.$transaction(
       [

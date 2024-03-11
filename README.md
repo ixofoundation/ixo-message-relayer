@@ -531,7 +531,7 @@ The successful creation of a transaction session results in the server storing t
 - `did`: Decentralized Identifier of the user.
 - `pubkey`: Public key of the user.
 - `transactions`: (a list of transactions to add to session and optional sequence)
-  - `hash`: Transaction hash, created through signX sdk util function `hashTransactDataV2`
+  - `hash`: Transaction hash, created through signX sdk util function `hashTransactData`
   - `secureNonce`: The session nonce for additional security.
   - `transactions`: An array of individual [transaction details](#transactionv2dto).
 
@@ -725,6 +725,8 @@ This endpoint plays a crucial role in the transaction session lifecycle within t
 Upon receiving this update, the endpoint not only updates the status of the corresponding transaction in the session but also automatically progresses the session by setting the next transaction in the sequence as active. Concurrently, it extends the validity of both the session and the next active transaction by updating their "validUntil" timestamps. This mechanism ensures a smooth transition from one transaction to the next within the session, maintaining a continuous flow of execution.
 
 Additionally, the endpoint provides the details of the next active transaction in its response. This feature enables the mobile app to seamlessly proceed with the next transaction in line, enhancing the efficiency of handling multiple transactions in a sequenced manner.
+
+If the update to the transactions has a `success: false` meaning the transaction was not sucessfully signed and broadcasted to the chain, can be chain error or user denying the transaction, then the session's "validUntil" will be updated to now to stop the session flow, and no next active transaction will be updated to become active.
 
 Security remains paramount, with access to this endpoint being strictly restricted to ensure that only the mobile app can make updates to the transaction data, thereby maintaining the integrity of the transaction session.
 
