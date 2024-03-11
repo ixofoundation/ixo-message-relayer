@@ -1,5 +1,4 @@
-// import { hashTransactData } from '@ixo/signx-sdk';
-import crypto from 'crypto';
+import { hashTransactData } from '@ixo/signx-sdk';
 
 export const returnError = (message: string, code?: number) => ({
   success: false,
@@ -54,23 +53,4 @@ export const createAddTransaction = (
     timestamp: trx.timestamp,
     sequence: sequence,
   };
-};
-
-// temp replace after singX npm package deployed
-export const hashTransactData = (data: any, fixedSort = true): string => {
-  const formattedData = {
-    address: data.address,
-    did: data.did,
-    pubkey: data.pubkey,
-    txBodyHex: data.txBodyHex,
-    timestamp: data.timestamp,
-  };
-
-  // Sort the keys to ensure consistent ordering for the hash
-  const sortedFormattedData = JSON.stringify(
-    formattedData,
-    fixedSort ? Object.keys(formattedData).sort() : null,
-  );
-
-  return crypto.createHash('sha256').update(sortedFormattedData).digest('hex');
 };

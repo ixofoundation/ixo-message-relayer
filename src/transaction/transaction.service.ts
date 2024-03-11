@@ -6,8 +6,8 @@ import {
 } from './transaction.dto';
 import { PrismaService } from 'nestjs-prisma';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { hashTransactData, returnError, returnSuccess } from 'src/utils';
-// import { hashTransactData } from '@ixo/signx-sdk';
+import { returnError, returnSuccess } from 'src/utils';
+import { hashTransactData } from '@ixo/signx-sdk';
 
 @Injectable()
 export class TransactionService {
