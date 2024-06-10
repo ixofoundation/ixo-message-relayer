@@ -7,6 +7,7 @@ import { LoginModule } from './login/login.module';
 import { TransactionModule } from './transaction/transaction.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
+import { DataModule } from './data/data.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { ConfigModule } from '@nestjs/config';
     ScheduleModule.forRoot(),
     LoginModule,
     TransactionModule,
+    DataModule,
   ],
   controllers: [AppController],
   providers: [AppService],
@@ -30,6 +32,8 @@ export class AppModule implements NestModule {
         '/transaction/v2/fetch',
         '/transaction/v2/session',
         '/transaction/v2/update',
+        '/data/fetch',
+        '/data/update',
       );
   }
 }
