@@ -101,7 +101,12 @@ export class DataService {
 
   async updateData(dto: DataUpdateDto) {
     // validate request
-    if (!dto.hash || !dto.secureHash || !dto.success || !dto.response) {
+    if (
+      !dto.hash ||
+      !dto.secureHash ||
+      typeof dto.success !== 'boolean' ||
+      !dto.response
+    ) {
       return returnError('Invalid request, missing parameters');
     }
 
