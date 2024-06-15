@@ -45,7 +45,7 @@ export class TransactionServiceV2 {
     }
 
     // order transactions by sequence and get prisma transaction object
-    let transactions: CreateAddTransactionReturn[] = [];
+    const transactions: CreateAddTransactionReturn[] = [];
     try {
       dto.transactions.transactions
         .sort((a, b) => a.sequence ?? 99 - b.sequence ?? 99)
@@ -160,7 +160,7 @@ export class TransactionServiceV2 {
     const lastTrxDone = !!lastTrxInSequence.data;
 
     // order transactions by sequence and get prisma transaction object
-    let transactions: CreateAddTransactionReturn[] = [];
+    const transactions: CreateAddTransactionReturn[] = [];
     try {
       dto.transactions
         .sort((a, b) => a.sequence ?? 999 - b.sequence ?? 999)

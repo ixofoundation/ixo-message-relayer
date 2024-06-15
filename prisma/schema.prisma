@@ -51,3 +51,14 @@ model TransactionV2 {
   TransactionsSession     TransactionsSessionV2? @relation(fields: [transactionsSessionHash], references: [hash], onDelete: Cascade)
   transactionsSessionHash String?
 }
+
+model Data {
+  hash       String   @id
+  secureHash String?
+  data       String
+  type       String
+  success    Boolean  @default(false)
+  response   Json?
+  validUntil DateTime
+  timestamp  DateTime @default(now())
+}
