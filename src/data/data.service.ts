@@ -38,7 +38,7 @@ export class DataService {
     });
 
     return returnSuccess({
-      message: 'Login request created successfully',
+      message: 'Data request created successfully',
     });
   }
 

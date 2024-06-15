@@ -17,7 +17,9 @@
 </div>
 <br />
 
-The Ixo Message Relayer is a server that facilitates a meticulously coordinated sequence of operations ensuring mobile-to-web authentication and transaction signing on the IXO blockchain. The process kicks off with the Login module, where the SDK generates a random hash and a secureHash (which is a SHA-256 hash of the hash and a secureNonce). A QR code, containing this hash, is then displayed for the mobile app to scan. Once scanned, the mobile app uploads the user data to the server using this hash as an identifier of the login request, which the SDK is polling for. This endpoint is secured with an AUTHORIZATION environment variable, ensuring only the mobile app with the correct authorization can upload this data. Subsequently, the SDK polls the server to fetch the login data, providing a secureNonce in the process. The server validates the request by hashing the provided hash and secureNonce to ensure it matches the secureHash, thereby affirming the authenticity of the user making the request. Upon validation, the server returns the login data to the SDK and purges the data from the server to maintain data cleanliness.
+The Ixo Message Relayer is a server that facilitates a meticulously coordinated sequence of operations ensuring mobile-to-web authentication, transaction signing, and secure data passing on the IXO blockchain. The process kicks off with the Login module, where the SDK generates a random hash and a secureHash (which is a SHA-256 hash of the hash and a secureNonce). A QR code, containing this hash, is then displayed for the mobile app to scan. Once scanned, the mobile app uploads the user data to the server using this hash as an identifier of the login request, which the SDK is polling for. This endpoint is secured with an AUTHORIZATION environment variable, ensuring only the mobile app with the correct authorization can upload this data. Subsequently, the SDK polls the server to fetch the login data, providing a secureNonce in the process. The server validates the request by hashing the provided hash and secureNonce to ensure it matches the secureHash, thereby affirming the authenticity of the user making the request. Upon validation, the server returns the login data to the SDK and purges the data from the server to maintain data cleanliness.
+
+The server also supports a secure data passing feature that allows the SDK to encrypt data, store it on the server, and have it decrypted and processed by the mobile app. This feature ensures that only the mobile app with the correct access token can retrieve and decrypt the data, making it useful for operations such as KYC (Know Your Customer) processes. The data is uploaded with an identifier hash and a type indicating the operation to be performed. The mobile app decrypts the data, performs the required operation, and uploads the success status and response to the server.
 
 Note: The following describes the V1 transaction module, which is now deprecated in favor of the enhanced V2 transactions module. Users are encouraged to transition to V2 for a more efficient and dynamic transaction handling experience.
 
@@ -118,8 +120,33 @@ The server is designed to work seamlessly with a complementary SDK which facilit
       - [Response Body](#response-body-12)
       - [Response Properties](#response-properties-12)
       - [Usage](#usage-10)
+  - [Data Endpoints](#data-endpoints)
+    - [POST `/data/create`](#post-datacreate)
+      - [Parameters](#parameters-10)
+      - [Request Body](#request-body-13)
+      - [Response Body](#response-body-13)
+      - [Response Properties](#response-properties-13)
+      - [Usage](#usage-11)
+    - [POST `/data/response`](#post-dataresponse)
+      - [Parameters](#parameters-11)
+      - [Request Body](#request-body-14)
+      - [Response Body](#response-body-14)
+      - [Response Properties](#response-properties-14)
+      - [Usage](#usage-12)
+    - [POST `/data/fetch`](#post-datafetch)
+      - [Parameters](#parameters-12)
+      - [Request Body](#request-body-15)
+      - [Response Body](#response-body-15)
+      - [Response Properties](#response-properties-15)
+      - [Usage](#usage-13)
+    - [POST `/data/update`](#post-dataupdate)
+      - [Parameters](#parameters-13)
+      - [Request Body](#request-body-16)
+      - [Response Body](#response-body-16)
+      - [Response Properties](#response-properties-16)
+      - [Usage](#usage-14)
   - [Types](#types)
-    - [TransactionV2Dto](#transactionv2dto)
+      - [TransactionV2Dto](#transactionv2dto)
   - [📃 License](#-license)
 
 ## Environment Variables
@@ -904,6 +931,192 @@ curl -X POST https://[server-address]/transaction/v2/next \
 ```
 
 These new V2 endpoints enhance the Ixo Message Relayer's capabilities, offering clients a more streamlined and efficient way to manage multiple transactions within a single session. They complement the existing endpoints, providing a comprehensive suite for various transaction management needs.
+
+## Data Endpoints
+
+### POST `/data/create`
+
+This endpoint allows the client to create a secure data request on the server. The client uploads encrypted data, which is stored on the server along with a unique identifier hash and a type indicating the specific operation to be performed by the mobile app (e.g., 'kyc' for Know Your Customer processes). The SDK generates the hash and encrypts the data before sending it to this endpoint. The endpoint ensures that the data remains encrypted and secure until accessed by the mobile app for decryption and processing. The stored data is protected by an authorization mechanism to ensure that only authorized clients (like the mobile app) can fetch the data requests.
+
+#### Parameters
+
+- `hash`: A unique identifier for the data request.
+- `data`: The encrypted data.
+- `type`: A string indicating the type of operation (e.g. 'kyc').
+
+#### Request Body
+
+```json
+{
+  "hash": "string",
+  "data": "string",
+  "type": "string"
+}
+```
+
+#### Response Body
+
+```json
+{
+  "success": "boolean",
+  "data": {
+    "message": "string"
+  }
+}
+```
+
+#### Response Properties
+
+- **success**: Indicates whether the request to server was successful.
+- **data**:
+  - **message**: A message explaining the success or failure of the request.
+
+#### Usage
+
+```bash
+curl -X POST https://[server-address]/data/create \
+-H "Content-Type: application/json" \
+-d '{"hash": "uniqueHash", "data": "encryptedData", "type": "kyc"}'
+```
+
+### POST `/data/response`
+
+This endpoint is used by the client to poll for the response of a previously created data request. After the mobile app processes the encrypted data, it updates the server with the outcome. The SDK repeatedly checks this endpoint to retrieve the response data, which includes whether the data processing was successful and any relevant response message. The polling process uses a secure nonce for validation, ensuring that only authorized requests can retrieve the data. If the data is not yet processed, the endpoint continues to poll until a response is available or a timeout occurs. This ensures a robust and secure flow of information between the client and mobile app.
+
+#### Parameters
+
+- `hash`: A unique identifier for the data request.
+- `secureNonce`: A secure nonce generated by the SDK, taht was used the generate the secureHash.
+
+#### Request Body
+
+```json
+{
+  "hash": "string",
+  "secureNonce": "string"
+}
+```
+
+#### Response Body
+
+```json
+{
+  "success": "boolean",
+  "data": {
+    "message": "string",
+    "response": "object",
+    "success": "boolean"
+  },
+  "code": "number"
+}
+```
+
+#### Response Properties
+
+- **success**: Indicates whether the request to server was successful.
+- **code**: A code indicating whether the SDK should continue polling (418 if it should continue).
+- **data**:
+  - **message**: A message explaining the success or failure of the request.
+  - **response**: The data handler response (dynamic, determined by mobile app)
+  - **success**: Wether the data handling was a sucess or fail due to rejection on mobile for example
+
+#### Usage
+
+```bash
+curl -X POST https://[server-address]/data/response \
+-H "Content-Type: application/json" \
+-d '{"hash": "uniqueHash", "secureNonce": "secureNonceValue"}'
+```
+
+### POST `/data/fetch`
+
+This endpoint allows the mobile app to fetch the encrypted data associated with a specific data request. By providing the unique identifier hash, the mobile app retrieves the encrypted data and the type of operation to be performed. The mobile app then decrypts the data using the encryption key passed through the QR code or deeplink and performs the specified operation. The endpoint is protected to ensure that only the authorized mobile app can access the encrypted data, maintaining the security and integrity of the data throughout the process.
+
+#### Parameters
+
+- `hash`: A unique identifier for the data request.
+
+#### Request Body
+
+```json
+{
+  "hash": "string"
+}
+```
+
+#### Response Body
+
+```json
+{
+  "success": "boolean",
+  "data": {
+    "data": "string",
+    "type": "string"
+  }
+}
+```
+
+#### Response Properties
+
+- **success**: Indicates whether the request to server was successful.
+- **data**:
+  - **data**: The encoded data.
+  - **type**: The data type to determine mobile handling.
+
+#### Usage
+
+```bash
+curl -X POST https://[server-address]/data/fetch \
+-H "Content-Type: application/json" \
+-d '{"hash": "uniqueHash"}'
+```
+
+### POST `/data/update`
+
+This endpoint allows the mobile app to update the server with the status of the data request after processing the encrypted data. The mobile app provides the secure hash, success status, and any response message, which are then stored on the server. The SDK can later retrieve the outcome of the data processing operation by polling the /data/response endpoint. This endpoint ensures that the data handling process is completed securely and that the client is informed of the success or failure of the operation. The endpoint is protected to ensure that only the mobile app can update the data status, maintaining the integrity of the data request lifecycle.
+
+#### Parameters
+
+- `hash`: A unique identifier for the data request.
+- `response`: Any response message or object or error message from the data handling. (determined by mobile)
+- `success`: A boolean indicating whether the data processing was successful or failed.
+- `secureHash`: The secure hash generated by the SDK using the secure nonce, passed to mobile through qr/deeplink.
+
+#### Request Body
+
+```json
+{
+  "hash": "string",
+  "secureHash": "string",
+  "success": "boolean",
+  "response": "string"
+}
+```
+
+#### Response Body
+
+```json
+{
+  "success": "boolean",
+  "data": {
+    "message": "string"
+  }
+}
+```
+
+#### Response Properties
+
+- **success**: Indicates whether the request to server was successful.
+- **data**:
+  - **message**: A message explaining the success or failure of the request.
+
+#### Usage
+
+```bash
+curl -X POST https://[server-address]/data/update \
+-H "Content-Type: application/json" \
+-d '{"hash": "uniqueHash", "secureHash": "secureHashValue", "success": true, "response": "responseMessage"}'
+```
 
 ## Types
 
