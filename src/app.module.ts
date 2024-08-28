@@ -8,6 +8,7 @@ import { TransactionModule } from './transaction/transaction.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
 import { DataModule } from './data/data.module';
+import { MatrixModule } from './matrix/matrix.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { DataModule } from './data/data.module';
     LoginModule,
     TransactionModule,
     DataModule,
+    MatrixModule,
   ],
   controllers: [AppController],
   providers: [AppService],
@@ -34,6 +36,7 @@ export class AppModule implements NestModule {
         '/transaction/v2/update',
         '/data/fetch',
         '/data/update',
+        '/matrix/login/create',
       );
   }
 }
