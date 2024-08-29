@@ -19,6 +19,12 @@
 
 The Ixo Message Relayer is a server that facilitates a meticulously coordinated sequence of operations ensuring mobile-to-web authentication, transaction signing, and secure data passing on the IXO blockchain. The process kicks off with the Login module, where the SDK generates a random hash and a secureHash (which is a SHA-256 hash of the hash and a secureNonce). A QR code, containing this hash, is then displayed for the mobile app to scan. Once scanned, the mobile app uploads the user data to the server using this hash as an identifier of the login request, which the SDK is polling for. This endpoint is secured with an AUTHORIZATION environment variable, ensuring only the mobile app with the correct authorization can upload this data. Subsequently, the SDK polls the server to fetch the login data, providing a secureNonce in the process. The server validates the request by hashing the provided hash and secureNonce to ensure it matches the secureHash, thereby affirming the authenticity of the user making the request. Upon validation, the server returns the login data to the SDK and purges the data from the server to maintain data cleanliness.
 
+The server also includes a Matrix integration feature, enabling the management of Matrix login credentials. The Matrix flow, similar to the login flow, begins with the SDK generating a random hash and a secureHash (derived from the hash and a secureNonce). A QR code containing this hash is then displayed for the mobile app to scan. Once scanned, the mobile app uploads the Matrix login request data to the server using this hash as the identifier.
+
+The Matrix login flow is conditional: it checks whether the user has a Matrix account and whether they are logged in to that account within the mobile app. If these conditions are met, the mobile app can proceed with the Matrix login. The server securely stores the Matrix login data and allows the SDK to poll for this data, similar to the regular login flow. The server validates the request by comparing the provided hash and secureNonce with the stored secureHash, ensuring that the request is authentic.
+
+Upon successful validation, the server returns the Matrix login data to the SDK. A unique Matrix access token is then generated for each 'site' (or client) during this process. This token, which uses the client/site as the device name during its creation, is unique to that specific client/site and can be revoked or deactivated by the user through the mobile app. This revocation can occur at the user's discretion or when they log out of their Matrix profile or switch profiles. The response format for Matrix endpoints is designed to be flexible, allowing for new fields to be added over time while maintaining backward compatibility with existing fields.
+
 The server also supports a secure data passing feature that allows the SDK to encrypt data, store it on the server, and have it decrypted and processed by the mobile app. This feature ensures that only the mobile app with the correct access token can retrieve and decrypt the data, making it useful for operations such as KYC (Know Your Customer) processes. The data is uploaded with an identifier hash and a type indicating the operation to be performed. The mobile app decrypts the data, performs the required operation, and uploads the success status and response to the server.
 
 Note: The following describes the V1 transaction module, which is now deprecated in favor of the enhanced V2 transactions module. Users are encouraged to transition to V2 for a more efficient and dynamic transaction handling experience.
@@ -145,8 +151,21 @@ The server is designed to work seamlessly with a complementary SDK which facilit
       - [Response Body](#response-body-16)
       - [Response Properties](#response-properties-16)
       - [Usage](#usage-14)
+  - [Matrix Login Endpoints](#matrix-login-endpoints)
+    - [POST `/matrix/login/create`](#post-matrixlogincreate)
+      - [Parameters](#parameters-14)
+      - [Request Body](#request-body-17)
+      - [Response Body](#response-body-17)
+      - [Response Properties](#response-properties-17)
+      - [Usage](#usage-15)
+    - [POST `/matrix/login/fetch`](#post-matrixloginfetch)
+      - [Parameters](#parameters-15)
+      - [Request Body](#request-body-18)
+      - [Response Body](#response-body-18)
+      - [Response Properties](#response-properties-18)
+      - [Usage](#usage-16)
   - [Types](#types)
-      - [TransactionV2Dto](#transactionv2dto)
+    - [TransactionV2Dto](#transactionv2dto)
   - [📃 License](#-license)
 
 ## Environment Variables
@@ -1116,6 +1135,104 @@ This endpoint allows the mobile app to update the server with the status of the 
 curl -X POST https://[server-address]/data/update \
 -H "Content-Type: application/json" \
 -d '{"hash": "uniqueHash", "secureHash": "secureHashValue", "success": true, "response": "responseMessage"}'
+```
+
+## Matrix Login Endpoints
+
+### POST `/matrix/login/create`
+
+This endpoint, similar to the login create endpoint, is utilized by the mobile app to store matrix login request data on the server. Upon scanning a QR code generated by the SDK, the mobile app initiates a matrix login request by sending the relevant data to this endpoint. The matrix login data is stored on the server under a unique hash identifier generated by the SDK, which facilitates subsequent polling by the SDK to retrieve this data for matrix login. The endpoint is protected by an authorization mechanism to ensure that only the mobile app can upload matrix login data.
+
+#### Parameters
+
+- `hash`: A unique identifier for the matrix login request.
+- `secureHash`: A secure hash generated by hashing the `hash` and a `secureNonce`.
+- `data`: The matrix login request data.
+- `success`: A boolean indicating the success status of the matrix login request.
+
+#### Request Body
+
+```json
+{
+  "hash": "string",
+  "secureHash": "string",
+  "data": "object",
+  "success": "boolean"
+}
+```
+
+#### Response Body
+
+```json
+{
+  "success": "boolean",
+  "data": {
+    "message": "string"
+  }
+}
+```
+
+#### Response Properties
+
+- **success**: Indicates whether the request to server was successful.
+- **data**:
+  - **message**: A message explaining the success or failure of the request.
+
+#### Usage
+
+```bash
+curl -X POST https://[server-address]/matrix/login/create \
+-H "Content-Type: application/json" \
+-d '{"hash": "uniqueHash", "secureHash": "secureHashValue", "data": { ... }, "success": true}'
+```
+
+### POST `/matrix/login/fetch`
+
+This endpoint, similar to the login fetch endpoint, facilitates the retrieval of matrix login request data that was previously stored on the server by the mobile app. The SDK polls this endpoint to fetch the matrix login data for a user based on a unique hash identifier. The server validates the request by hashing the provided hash and a secureNonce to ensure it matches the stored secureHash, thereby affirming the authenticity of the user making the request. Upon validation, the server returns the matrix login data to the SDK and deletes the data from the server to maintain data cleanliness.
+
+#### Parameters
+
+- `hash`: A unique identifier for the matrix login request.
+- `secureNonce`: A secure nonce generated by the SDK.
+
+#### Request Body
+
+```json
+{
+  "hash": "string",
+  "secureNonce": "string"
+}
+```
+
+#### Response Body
+
+```json
+{
+  "success": "boolean",
+  "data": {
+    "message": "string",
+    "data": "object",
+    "success": "boolean"
+  },
+  "code": "number"
+}
+```
+
+#### Response Properties
+
+- **success**: Indicates whether the request to server was successful.
+- **code**: A code indicating whether the SDK should continue polling (418 if it should continue).
+- **data**:
+  - **message**: A message explaining the success or failure of the request.
+  - **data**: The matrix login data
+  - **success**: Whether the matrix login was a success or fail due to rejection on mobile for example
+
+#### Usage
+
+```bash
+curl -X POST https://[server-address]/matrix/login/fetch \
+-H "Content-Type: application/json" \
+-d '{"hash": "uniqueHash", "secureNonce": "secureNonceValue"}'
 ```
 
 ## Types
