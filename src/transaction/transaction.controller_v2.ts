@@ -27,8 +27,10 @@ export class TransactionControllerV2 {
   @Post('/add') // for client
   addTransactionRequest(@Body() dto: TransactionV2AddDto) {
     try {
+      console.log('addTransactionRequest', dto);
       return this.transactionService.addTransaction(dto);
     } catch (error) {
+      console.log('addTransactionRequest', error);
       throw new HttpException(error.message, 400);
     }
   }

@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 
 export function authorization(req: Request, res: Response, next: NextFunction) {
+  console.log('req body', req.body);
   if (req.get('Authorization') === process.env.AUTHORIZATION) {
     next();
     return;
