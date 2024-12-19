@@ -16,7 +16,8 @@ export const returnSuccess = (data?: any) => ({
 // Helper function to run through validation and sequence increase etc and returns the transction object to be saved
 export type CreateAddTransactionReturn = ReturnType<
   typeof createAddTransaction
->;
+> & { validUntil?: Date; active?: boolean };
+
 export const createAddTransaction = (
   session: {
     address: string;

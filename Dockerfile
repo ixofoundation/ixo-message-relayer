@@ -8,7 +8,6 @@ RUN yarn --pure-lockfile
 
 COPY . .
 
-RUN npx prisma generate
 RUN yarn build
 
 CMD ["yarn","start:prod"]

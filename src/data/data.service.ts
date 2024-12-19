@@ -5,14 +5,14 @@ import {
   DataUpdateDto,
   DataFetchDto,
 } from './data.dto';
-import { PrismaService } from 'nestjs-prisma';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { generateSecureHash } from '@ixo/signx-sdk';
 import { returnError, returnSuccess } from 'src/utils';
+import { pool } from 'src/postgres/client';
 
 @Injectable()
 export class DataService {
-  constructor(private prisma: PrismaService) {}
+  constructor() {}
 
   async createData(dto: DataCreateDto) {
     // validate request
@@ -22,20 +22,26 @@ export class DataService {
 
     const validUntil = new Date(Date.now() + 1000 * 60 * 2); // 2 minutes
 
-    await this.prisma.data.upsert({
-      where: { hash: dto.hash },
-      create: {
-        hash: dto.hash,
-        data: dto.data,
-        type: dto.type,
-        validUntil,
-      },
-      update: {
-        data: dto.data,
-        type: dto.type,
-        validUntil,
-      },
-    });
+    // upsert logic:
+    // Try SELECT first:
+    const existing = await pool.query(
+      `SELECT * FROM "Data" WHERE "hash" = $1`,
+      [dto.hash],
+    );
+
+    if (existing.rows.length === 0) {
+      // insert new record
+      await pool.query(
+        `INSERT INTO "Data" ("hash","data","type","validUntil") VALUES ($1,$2,$3,$4)`,
+        [dto.hash, dto.data, dto.type, validUntil],
+      );
+    } else {
+      // update existing record
+      await pool.query(
+        `UPDATE "Data" SET "data" = $2, "type" = $3, "validUntil" = $4 WHERE "hash" = $1`,
+        [dto.hash, dto.data, dto.type, validUntil],
+      );
+    }
 
     return returnSuccess({
       message: 'Data request created successfully',
@@ -48,9 +54,10 @@ export class DataService {
       return returnError('Invalid request, missing parameters');
     }
 
-    const data = await this.prisma.data.findUnique({
-      where: { hash: dto.hash },
-    });
+    const result = await pool.query(`SELECT * FROM "Data" WHERE "hash" = $1`, [
+      dto.hash,
+    ]);
+    const data = result.rows[0];
     if (!data) {
       return returnError('Data not found');
     }
@@ -68,7 +75,7 @@ export class DataService {
     }
 
     // remove data after fetching
-    await this.prisma.data.delete({ where: { hash: dto.hash } });
+    await pool.query(`DELETE FROM "Data" WHERE "hash" = $1`, [dto.hash]);
 
     return returnSuccess({
       message: 'Data response fetched successfully',
@@ -83,9 +90,10 @@ export class DataService {
       return returnError('Invalid request, missing parameters');
     }
 
-    const data = await this.prisma.data.findUnique({
-      where: { hash: dto.hash },
-    });
+    const result = await pool.query(`SELECT * FROM "Data" WHERE "hash" = $1`, [
+      dto.hash,
+    ]);
+    const data = result.rows[0];
     if (!data) {
       return returnError('Data not found');
     }
@@ -110,9 +118,10 @@ export class DataService {
       return returnError('Invalid request, missing parameters');
     }
 
-    const data = await this.prisma.data.findUnique({
-      where: { hash: dto.hash },
-    });
+    const result = await pool.query(`SELECT * FROM "Data" WHERE "hash" = $1`, [
+      dto.hash,
+    ]);
+    const data = result.rows[0];
     if (!data) {
       return returnError('Data not found');
     }
@@ -121,14 +130,10 @@ export class DataService {
     }
 
     // update data with response
-    await this.prisma.data.update({
-      where: { hash: dto.hash },
-      data: {
-        secureHash: dto.secureHash,
-        success: dto.success,
-        response: dto.response,
-      },
-    });
+    await pool.query(
+      `UPDATE "Data" SET "secureHash" = $2, "success" = $3, "response" = $4 WHERE "hash" = $1`,
+      [dto.hash, dto.secureHash, dto.success, dto.response],
+    );
 
     return returnSuccess({
       message: 'Data updated successfully',
@@ -138,12 +143,8 @@ export class DataService {
   // clear expired data every 5 minutes
   @Cron(CronExpression.EVERY_5_MINUTES)
   async clearExpiredData() {
-    await this.prisma.data.deleteMany({
-      where: {
-        validUntil: {
-          lte: new Date(),
-        },
-      },
-    });
+    await pool.query(`DELETE FROM "Data" WHERE "validUntil" <= $1`, [
+      new Date(),
+    ]);
   }
 }

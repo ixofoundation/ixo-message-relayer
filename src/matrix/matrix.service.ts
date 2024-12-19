@@ -1,13 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { MatrixLoginFetchDto, MatrixLoginCreateDto } from './matrix.dto';
-import { PrismaService } from 'nestjs-prisma';
-import { Cron, CronExpression } from '@nestjs/schedule';
 import { generateSecureHash } from '@ixo/signx-sdk';
 import { returnError, returnSuccess } from 'src/utils';
+import { pool } from 'src/postgres/client';
 
 @Injectable()
 export class MatrixService {
-  constructor(private prisma: PrismaService) {}
+  constructor() {}
 
   async createMatrixLogin(dto: MatrixLoginCreateDto) {
     // validate request
@@ -22,22 +21,36 @@ export class MatrixService {
 
     const validUntil = new Date(Date.now() + 1000 * 60 * 2); // 2 minutes
 
-    await this.prisma.login.upsert({
-      where: { hash: dto.hash },
-      create: {
-        hash: dto.hash,
-        secureHash: dto.secureHash,
-        data: dto.data,
-        validUntil,
-        success: dto.success,
-      },
-      update: {
-        secureHash: dto.secureHash,
-        data: dto.data,
-        validUntil,
-        success: dto.success,
-      },
-    });
+    // upsert logic for "Login" table
+    const existing = await pool.query(
+      `SELECT * FROM "Login" WHERE "hash" = $1`,
+      [dto.hash],
+    );
+    if (existing.rows.length === 0) {
+      // insert new record
+      await pool.query(
+        `INSERT INTO "Login" ("hash","secureHash","data","validUntil","success") VALUES ($1,$2,$3,$4,$5)`,
+        [
+          dto.hash,
+          dto.secureHash,
+          JSON.parse(dto.data),
+          validUntil,
+          dto.success,
+        ],
+      );
+    } else {
+      // update existing record
+      await pool.query(
+        `UPDATE "Login" SET "secureHash" = $2, "data" = $3, "validUntil" = $4, "success" = $5 WHERE "hash" = $1`,
+        [
+          dto.hash,
+          dto.secureHash,
+          JSON.parse(dto.data),
+          validUntil,
+          dto.success,
+        ],
+      );
+    }
 
     return returnSuccess({
       message: 'Matrix login request created successfully',
@@ -50,9 +63,11 @@ export class MatrixService {
       return returnError('Invalid request, missing parameters');
     }
 
-    const login = await this.prisma.login.findUnique({
-      where: { hash: dto.hash },
-    });
+    const loginResult = await pool.query(
+      `SELECT * FROM "Login" WHERE "hash" = $1`,
+      [dto.hash],
+    );
+    const login = loginResult.rows[0];
     if (!login) {
       return returnError('Matrix login request not found', 418); // 418 I'm a teapot, for sdk to know to keep polling
     }
@@ -67,24 +82,12 @@ export class MatrixService {
     }
 
     // remove login request after fetching
-    await this.prisma.login.delete({ where: { hash: dto.hash } });
+    await pool.query(`DELETE FROM "Login" WHERE "hash" = $1`, [dto.hash]);
 
     return returnSuccess({
       message: 'Matrix login request fetched successfully',
       data: login.data,
       success: login.success,
-    });
-  }
-
-  // clear expired login requests every minute
-  @Cron(CronExpression.EVERY_5_MINUTES)
-  async clearExpiredLogins() {
-    await this.prisma.login.deleteMany({
-      where: {
-        validUntil: {
-          lte: new Date(),
-        },
-      },
     });
   }
 }

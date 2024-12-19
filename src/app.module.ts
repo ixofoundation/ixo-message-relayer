@@ -1,7 +1,6 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { PrismaModule } from 'nestjs-prisma';
 import { authorization } from './auth.middleware';
 import { LoginModule } from './login/login.module';
 import { TransactionModule } from './transaction/transaction.module';
@@ -13,7 +12,6 @@ import { MatrixModule } from './matrix/matrix.module';
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    PrismaModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
     LoginModule,
     TransactionModule,

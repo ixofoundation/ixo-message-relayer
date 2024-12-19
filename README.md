@@ -4,7 +4,7 @@
 
 # Ixo Message Relayer
 
-![Docker](https://img.shields.io/badge/Docker-2CA5E0?style=for-the-badge&logo=docker&logoColor=white)![NestJS](https://img.shields.io/badge/nestjs-E0234E?style=for-the-badge&logo=nestjs&logoColor=white)![NodeJS](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)![Prisma](https://img.shields.io/badge/Prisma-3982CE?style=for-the-badge&logo=Prisma&logoColor=white)![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2CA5E0?style=for-the-badge&logo=docker&logoColor=white)![NestJS](https://img.shields.io/badge/nestjs-E0234E?style=for-the-badge&logo=nestjs&logoColor=white)![NodeJS](https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
 
 [![ixo](https://img.shields.io/badge/ixo-project-blue)](https://ixo.foundation)
 [![GitHub](https://img.shields.io/github/stars/ixofoundation/jambo?style=social)](https://github.com/ixofoundation/ixo-message-relayer)
@@ -249,7 +249,6 @@ services:
       - 5432:5432
     volumes:
       - ./data/db:/var/lib/postgresql/data
-      - ./prisma/migrations/20230301091449_init/:/docker-entrypoint-initdb.d/
 ```
 
 ## API Documentation
@@ -712,7 +711,7 @@ This endpoint adopts a long polling approach, enhancing the mobile app's ability
 - **success**: Indicates whether the request to server was successful.
 - **code**: A code indicating whether the mobile should continue polling (418 if it should continue).
 - **data**:
-  - Details of the active transaction as queried from prisma
+  - Details of the active transaction as queried from db
 
 #### Usage
 
@@ -754,7 +753,7 @@ This endpoint allows the mobile app to access detailed information about a speci
 
 - **success**: Indicates whether the request to server was successful.
 - **data**:
-  - Details of the transaction session as queried from prisma, also includes all the transactions of the session
+  - Details of the transaction session as queried from db, also includes all the transactions of the session
 
 #### Usage
 

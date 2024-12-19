@@ -4,14 +4,14 @@ import {
   TransactionFetchDto,
   TransactionUpdateDto,
 } from './transaction.dto';
-import { PrismaService } from 'nestjs-prisma';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { returnError, returnSuccess } from 'src/utils';
 import { hashTransactData } from '@ixo/signx-sdk';
+import { pool } from 'src/postgres/client';
 
 @Injectable()
 export class TransactionService {
-  constructor(private prisma: PrismaService) {}
+  constructor() {}
 
   async createTransaction(dto: TransactionCreateDto) {
     // validate request
@@ -42,24 +42,43 @@ export class TransactionService {
       return returnError('Invalid request, hash mismatch');
     }
 
-    const data = {
-      address: dto.address,
-      did: dto.did,
-      pubkey: dto.pubkey,
-      txBodyHex: dto.txBodyHex,
-      timestamp: dto.timestamp,
-      validUntil,
-    };
+    // Upsert logic
+    const existing = await pool.query(
+      `SELECT * FROM "Transaction" WHERE "hash" = $1`,
+      [dto.hash],
+    );
 
-    await this.prisma.transaction.upsert({
-      where: { hash: dto.hash },
-      create: {
-        hash: dto.hash,
-        ...data,
-        success: false,
-      },
-      update: data,
-    });
+    if (existing.rows.length === 0) {
+      // insert
+      await pool.query(
+        `INSERT INTO "Transaction" ("hash","address","did","pubkey","txBodyHex","timestamp","validUntil","success")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,false)`,
+        [
+          dto.hash,
+          dto.address,
+          dto.did,
+          dto.pubkey,
+          dto.txBodyHex,
+          dto.timestamp,
+          validUntil,
+        ],
+      );
+    } else {
+      // update
+      await pool.query(
+        `UPDATE "Transaction" SET "address"=$2,"did"=$3,"pubkey"=$4,"txBodyHex"=$5,"timestamp"=$6,"validUntil"=$7
+         WHERE "hash"=$1`,
+        [
+          dto.hash,
+          dto.address,
+          dto.did,
+          dto.pubkey,
+          dto.txBodyHex,
+          dto.timestamp,
+          validUntil,
+        ],
+      );
+    }
 
     return returnSuccess({
       message: 'Transaction request created successfully',
@@ -73,9 +92,11 @@ export class TransactionService {
       return returnError('Invalid request, missing parameters');
     }
 
-    const transaction = await this.prisma.transaction.findUnique({
-      where: { hash: dto.hash },
-    });
+    const result = await pool.query(
+      `SELECT * FROM "Transaction" WHERE "hash" = $1`,
+      [dto.hash],
+    );
+    const transaction = result.rows[0];
     if (!transaction) {
       return returnError('Transaction request not found');
     }
@@ -91,9 +112,11 @@ export class TransactionService {
       return returnError('Invalid request, missing parameters');
     }
 
-    const transaction = await this.prisma.transaction.findUnique({
-      where: { hash: dto.hash },
-    });
+    const result = await pool.query(
+      `SELECT * FROM "Transaction" WHERE "hash" = $1`,
+      [dto.hash],
+    );
+    const transaction = result.rows[0];
     if (!transaction) {
       return returnError('Transaction request not found');
     }
@@ -101,10 +124,10 @@ export class TransactionService {
       return returnError('Transaction request already contain data');
     }
 
-    await this.prisma.transaction.update({
-      where: { hash: dto.hash },
-      data: { data: dto.data, success: dto.success },
-    });
+    await pool.query(
+      `UPDATE "Transaction" SET "data"=$2,"success"=$3 WHERE "hash"=$1`,
+      [dto.hash, dto.data, dto.success],
+    );
 
     return returnSuccess({
       message: 'Transaction request updated successfully',
@@ -117,9 +140,11 @@ export class TransactionService {
       return returnError('Invalid request, missing parameters');
     }
 
-    const transaction = await this.prisma.transaction.findUnique({
-      where: { hash: dto.hash },
-    });
+    const result = await pool.query(
+      `SELECT * FROM "Transaction" WHERE "hash" = $1`,
+      [dto.hash],
+    );
+    const transaction = result.rows[0];
     if (!transaction) {
       return returnError('Transaction request not found');
     }
@@ -137,12 +162,8 @@ export class TransactionService {
   @Cron(CronExpression.EVERY_MINUTE)
   async clearExpiredTransactions() {
     const nowSub2Minutes = new Date(Date.now() - 1000 * 60 * 2); // 2 minutes subtracted to current time for leaway gap
-    await this.prisma.transaction.deleteMany({
-      where: {
-        validUntil: {
-          lte: nowSub2Minutes,
-        },
-      },
-    });
+    await pool.query(`DELETE FROM "Transaction" WHERE "validUntil" <= $1`, [
+      nowSub2Minutes,
+    ]);
   }
 }

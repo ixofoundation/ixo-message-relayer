@@ -6,7 +6,6 @@ import {
   TransactionV2ResponseDto,
   TransactionUpdateDto,
 } from './transaction.dto';
-import { PrismaService } from 'nestjs-prisma';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import {
   createAddTransaction,
@@ -15,10 +14,11 @@ import {
   CreateAddTransactionReturn,
 } from 'src/utils';
 import { generateSecureHash } from '@ixo/signx-sdk';
+import { pool, withTransaction } from 'src/postgres/client';
 
 @Injectable()
 export class TransactionServiceV2 {
-  constructor(private prisma: PrismaService) {}
+  constructor() {}
 
   async createTransaction(dto: TransactionV2CreateDto) {
     // validate request
@@ -44,7 +44,7 @@ export class TransactionServiceV2 {
       );
     }
 
-    // order transactions by sequence and get prisma transaction object
+    // order transactions by sequence and create them
     const transactions: CreateAddTransactionReturn[] = [];
     try {
       dto.transactions.transactions
@@ -77,24 +77,30 @@ export class TransactionServiceV2 {
 
     // set first transaction as active and valid for 2 minutes
     const validUntil = new Date(Date.now() + 1000 * 60 * 2); // 2 minutes
-    // @ts-ignore
     transactions[0].validUntil = validUntil;
-    // @ts-ignore
     transactions[0].active = true;
 
-    await this.prisma.transactionsSessionV2.create({
-      data: {
-        hash: dto.hash,
-        address: dto.address,
-        did: dto.did,
-        pubkey: dto.pubkey,
-        validUntil,
-        transactions: {
-          createMany: {
-            data: transactions,
-          },
-        },
-      },
+    await withTransaction(async (client) => {
+      // create session
+      await client.query(
+        `INSERT INTO "TransactionsSessionV2" ("hash","address","did","pubkey","validUntil") VALUES ($1,$2,$3,$4,$5)`,
+        [dto.hash, dto.address, dto.did, dto.pubkey, validUntil],
+      );
+
+      // insert transactions
+      const insertTrxQuery = `INSERT INTO "TransactionV2" ("hash","txBodyHex","success","validUntil","data","timestamp","sequence","active","transactionsSessionHash")
+                              VALUES ($1,$2,false,$3,NULL,$4,$5,$6,$7)`;
+      for (const trx of transactions) {
+        await client.query(insertTrxQuery, [
+          trx.hash,
+          trx.txBodyHex,
+          trx.validUntil ?? null,
+          trx.timestamp,
+          trx.sequence,
+          trx.active ?? false,
+          dto.hash,
+        ]);
+      }
     });
 
     return returnSuccess({
@@ -102,7 +108,6 @@ export class TransactionServiceV2 {
       activeTransaction: {
         hash: transactions[0].hash,
         sequence: transactions[0].sequence,
-        // @ts-ignore
         validUntil: transactions[0].validUntil,
       },
     });
@@ -125,12 +130,7 @@ export class TransactionServiceV2 {
       );
     }
 
-    // get prisma transaction session object
-    const session = await this.prisma.transactionsSessionV2.findUnique({
-      where: { hash: dto.hash },
-      include: { transactions: true },
-    });
-
+    const session = await this.fetchSessionByHash(dto.hash);
     if (!session) {
       return returnError('Transactions session not found', 418); // 418 I'm a teapot, for sdk to know to start new session
     }
@@ -159,7 +159,7 @@ export class TransactionServiceV2 {
     )[0];
     const lastTrxDone = !!lastTrxInSequence.data;
 
-    // order transactions by sequence and get prisma transaction object
+    // order new transactions by sequence (if any provided) and create them
     const transactions: CreateAddTransactionReturn[] = [];
     try {
       dto.transactions
@@ -184,26 +184,35 @@ export class TransactionServiceV2 {
     const validUntil = new Date(Date.now() + 1000 * 60 * 2); // 2 minutes
     if (lastTrxDone) {
       // set first transaction in newly added sequence as active and valid for 2 minutes
-      // @ts-ignore
       transactions[0].validUntil = validUntil;
-      // @ts-ignore
       transactions[0].active = true;
     }
 
-    const res = await this.prisma.transactionsSessionV2.update({
-      where: { hash: dto.hash },
-      data: {
-        ...(lastTrxDone ? { validUntil } : {}),
-        transactions: {
-          createMany: {
-            data: transactions,
-          },
-        },
-      },
-      include: { transactions: true },
+    await withTransaction(async (client) => {
+      if (lastTrxDone) {
+        await client.query(
+          `UPDATE "TransactionsSessionV2" SET "validUntil" = $2 WHERE "hash" = $1`,
+          [dto.hash, validUntil],
+        );
+      }
+
+      const insertTrxQuery = `INSERT INTO "TransactionV2" ("hash","txBodyHex","success","validUntil","data","timestamp","sequence","active","transactionsSessionHash")
+                              VALUES ($1,$2,false,$3,NULL,$4,$5,$6,$7)`;
+      for (const trx of transactions) {
+        await client.query(insertTrxQuery, [
+          trx.hash,
+          trx.txBodyHex,
+          trx.validUntil ?? null,
+          trx.timestamp,
+          trx.sequence,
+          trx.active ?? false,
+          dto.hash,
+        ]);
+      }
     });
 
-    const activeTrx = res.transactions.find((t) => t.active);
+    const updatedSession = await this.fetchSessionByHash(dto.hash);
+    const activeTrx = updatedSession.transactions.find((t) => t.active);
 
     return returnSuccess({
       message: 'Transactions added to session successfully',
@@ -221,10 +230,7 @@ export class TransactionServiceV2 {
       return returnError('Invalid request, missing parameters');
     }
 
-    const session = await this.prisma.transactionsSessionV2.findUnique({
-      where: { hash: dto.hash },
-      include: { transactions: true },
-    });
+    const session = await this.fetchSessionByHash(dto.hash);
     if (!session) {
       return returnError('Transaction session not found');
     }
@@ -241,10 +247,7 @@ export class TransactionServiceV2 {
       return returnError('Invalid request, missing parameters');
     }
 
-    const session = await this.prisma.transactionsSessionV2.findUnique({
-      where: { hash: dto.hash },
-      include: { transactions: true },
-    });
+    const session = await this.fetchSessionByHash(dto.hash);
     if (!session) {
       return returnError('Transaction session not found');
     }
@@ -266,9 +269,7 @@ export class TransactionServiceV2 {
       return returnError('Invalid request, missing parameters');
     }
 
-    const transaction = await this.prisma.transactionV2.findUnique({
-      where: { hash: dto.hash },
-    });
+    const transaction = await this.fetchTransactionByHash(dto.hash);
     if (!transaction) {
       return returnError('Transaction request not found');
     }
@@ -279,10 +280,9 @@ export class TransactionServiceV2 {
       return returnError('Transaction request already contains data');
     }
 
-    const session = await this.prisma.transactionsSessionV2.findUnique({
-      where: { hash: transaction.transactionsSessionHash },
-      include: { transactions: true },
-    });
+    const session = await this.fetchSessionByHash(
+      transaction.transactionsSessionHash,
+    );
     if (!session) {
       return returnError('Transaction session not found');
     }
@@ -298,24 +298,26 @@ export class TransactionServiceV2 {
     // clients can handle the error, but need to start new session
     const validUntil = new Date(Date.now() + (dto.success ? 1000 * 60 * 2 : 0)); // 2 minutes
 
-    await this.prisma.$transaction(
-      [
-        this.prisma.transactionsSessionV2.update({
-          where: { hash: transaction.transactionsSessionHash },
-          data: { validUntil },
-        }),
-        this.prisma.transactionV2.update({
-          where: { hash: dto.hash },
-          data: { data: dto.data, success: dto.success, active: false },
-        }),
-        nextActiveTrx
-          ? this.prisma.transactionV2.update({
-              where: { hash: nextActiveTrx.hash },
-              data: { active: true, validUntil },
-            })
-          : null,
-      ].filter((p) => p),
-    );
+    await withTransaction(async (client) => {
+      // update session validUntil
+      await client.query(
+        `UPDATE "TransactionsSessionV2" SET "validUntil" = $2 WHERE "hash" = $1`,
+        [transaction.transactionsSessionHash, validUntil],
+      );
+
+      // update current transaction
+      await client.query(
+        `UPDATE "TransactionV2" SET "data"=$2,"success"=$3,"active"=false WHERE "hash"=$1`,
+        [dto.hash, dto.data, dto.success],
+      );
+
+      if (nextActiveTrx) {
+        await client.query(
+          `UPDATE "TransactionV2" SET "active"=true,"validUntil"=$2 WHERE "hash"=$1`,
+          [nextActiveTrx.hash, validUntil],
+        );
+      }
+    });
 
     return returnSuccess({
       message: 'Transaction request updated successfully',
@@ -339,28 +341,21 @@ export class TransactionServiceV2 {
       return returnError('Invalid request, missing parameters');
     }
 
-    const transaction = await this.prisma.transactionV2.findUnique({
-      where: { hash: dto.hash },
-    });
+    const transaction = await this.fetchTransactionByHash(dto.hash);
     if (!transaction) {
       return returnError('Transaction request not found');
     }
 
-    const session = await this.prisma.transactionsSessionV2.findUnique({
-      where: { hash: transaction.transactionsSessionHash },
-      select: {
-        hash: true,
-        transactions: { where: { sequence: 1 } },
-        validUntil: true,
-      },
-    });
+    const session = await this.fetchSessionByHash(
+      transaction.transactionsSessionHash,
+    );
     if (!session) {
       return returnError('Transaction session not found');
     }
 
     // validate session hash with secureNonce, to ensure user have the correct secureNonce and correct hash was generated
     const secureHash = generateSecureHash(
-      session.transactions[0]?.hash ?? '',
+      session.transactions.find((t) => t.sequence === 1)?.hash ?? '',
       dto.secureNonce,
     );
     if (session.hash !== secureHash) {
@@ -371,12 +366,7 @@ export class TransactionServiceV2 {
       return returnError('Transaction request does not contain data', 418); // 418 I'm a teapot, for sdk to know to keep polling
     }
 
-    const nextActiveTrx = await this.prisma.transactionV2.findFirst({
-      where: {
-        transactionsSessionHash: session.hash,
-        active: true,
-      },
-    });
+    const nextActiveTrx = session.transactions.find((t) => t.active);
 
     return returnSuccess({
       message: 'Transaction request found',
@@ -402,10 +392,7 @@ export class TransactionServiceV2 {
       return returnError('Invalid request, missing parameters');
     }
 
-    const session = await this.prisma.transactionsSessionV2.findUnique({
-      where: { hash: dto.hash },
-      select: { hash: true, transactions: true, validUntil: true },
-    });
+    const session = await this.fetchSessionByHash(dto.hash);
     if (!session) {
       return returnError('Transaction session not found');
     }
@@ -444,12 +431,54 @@ export class TransactionServiceV2 {
   @Cron(CronExpression.EVERY_MINUTE)
   async clearExpiredTransactionSessions() {
     const nowSub2Minutes = new Date(Date.now() - 1000 * 60 * 2); // 2 minutes subtracted to current time for leaway gap
-    await this.prisma.transactionsSessionV2.deleteMany({
-      where: {
-        validUntil: {
-          lte: nowSub2Minutes,
-        },
-      },
-    });
+    await pool.query(
+      `DELETE FROM "TransactionsSessionV2" WHERE "validUntil" <= $1`,
+      [nowSub2Minutes],
+    );
+  }
+
+  // Helper functions
+  private async fetchSessionByHash(hash: string): Promise<{
+    hash: string;
+    address: string;
+    did: string;
+    pubkey: string;
+    validUntil: Date;
+    transactions: any[];
+  } | null> {
+    const sessionResult = await pool.query(
+      `SELECT * FROM "TransactionsSessionV2" WHERE "hash"=$1`,
+      [hash],
+    );
+    const session = sessionResult.rows[0];
+    if (!session) return null;
+
+    const trxResult = await pool.query(
+      `SELECT * FROM "TransactionV2" WHERE "transactionsSessionHash"=$1 ORDER BY "sequence" ASC`,
+      [hash],
+    );
+    return {
+      ...session,
+      transactions: trxResult.rows,
+    };
+  }
+
+  private async fetchTransactionByHash(hash: string): Promise<{
+    hash: string;
+    txBodyHex: string;
+    success: boolean;
+    validUntil: Date | null;
+    data: any;
+    timestamp: string;
+    sequence: number;
+    active: boolean;
+    transactionsSessionHash: string;
+  } | null> {
+    const result = await pool.query(
+      `SELECT * FROM "TransactionV2" WHERE "hash"=$1`,
+      [hash],
+    );
+    if (result.rows.length === 0) return null;
+    return result.rows[0];
   }
 }

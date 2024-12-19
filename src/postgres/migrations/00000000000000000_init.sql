@@ -55,3 +55,17 @@ CREATE UNIQUE INDEX "Login_secureHash_key" ON "Login"("secureHash");
 
 -- AddForeignKey
 ALTER TABLE "TransactionV2" ADD CONSTRAINT "TransactionV2_transactionsSessionHash_fkey" FOREIGN KEY ("transactionsSessionHash") REFERENCES "TransactionsSessionV2"("hash") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- CreateTable
+CREATE TABLE "Data" (
+    "hash" TEXT NOT NULL,
+    "secureHash" TEXT,
+    "data" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "success" BOOLEAN NOT NULL DEFAULT false,
+    "response" JSONB,
+    "validUntil" TIMESTAMP(3) NOT NULL,
+    "timestamp" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Data_pkey" PRIMARY KEY ("hash")
+);
