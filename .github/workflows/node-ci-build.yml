@@ -1,0 +1,14 @@
+name: Build and Release
+on:
+  push:
+    branches:
+      - main
+      - develop
+
+jobs:
+  build-and-release:
+    uses: ixofoundation/ixo-github-actions/.github/workflows/node-ci-build.yml@main
+    with:
+      commit_sha: ${{ github.sha }}
+      node_version: '20.x'
+    secrets: inherit
