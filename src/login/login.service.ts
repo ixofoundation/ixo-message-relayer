@@ -32,25 +32,13 @@ export class LoginService {
       // insert new login
       await pool.query(
         `INSERT INTO "Login" ("hash","secureHash","data","validUntil","success") VALUES ($1,$2,$3,$4,$5)`,
-        [
-          dto.hash,
-          dto.secureHash,
-          JSON.parse(dto.data),
-          validUntil,
-          dto.success,
-        ],
+        [dto.hash, dto.secureHash, dto.data, validUntil, dto.success],
       );
     } else {
       // update existing login
       await pool.query(
         `UPDATE "Login" SET "secureHash" = $2, "data" = $3, "validUntil" = $4, "success" = $5 WHERE "hash" = $1`,
-        [
-          dto.hash,
-          dto.secureHash,
-          JSON.parse(dto.data),
-          validUntil,
-          dto.success,
-        ],
+        [dto.hash, dto.secureHash, dto.data, validUntil, dto.success],
       );
     }
 
